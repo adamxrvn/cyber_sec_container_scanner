@@ -1,0 +1,26 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: app-ingress
+  namespace: datavisionaries-project
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+spec:
+  ingressClassName: nginx
+  rules:
+    - http:
+        paths:
+          - path: /api01/alert-service(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: alert-service
+                port:
+                  number: 80
+#          - path: /kea-project/pong
+#            pathType: Prefix
+#            backend:
+#              service:
+#                name: pong-app-service
+#                port:
+#                  number: 80

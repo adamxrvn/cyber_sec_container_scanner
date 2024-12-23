@@ -6,11 +6,12 @@ metadata:
   labels:
     app: alert-service
 spec:
-  type: LoadBalancer   # or NodePort, LoadBalancer if you want external access
+  type: ClusterIP
   selector:
     app: alert-service
   ports:
-    - port: 9000
-      targetPort: 9000
+    - port: 80
+      targetPort: 80
       protocol: TCP
       name: http
+

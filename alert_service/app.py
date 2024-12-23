@@ -16,10 +16,18 @@ from schemas import (
 app = FastAPI(
     title="Alerting Microservice",
     description="Sends alert emails to users and logs them in audit logs",
-    version="1.0.0"
+    version="1.0.0",
+    root_path="/api01/alert-service",
+    swagger_ui_parameters={"openapiUrl": "/api01/alert-service/openapi.json"}
+
 )
 
 init_db()
+
+
+@app.get('/')
+def hello_world():
+    return{'hello':'world'}
 
 ##############################################################################
 # 1) Helper: send_email
@@ -288,5 +296,5 @@ def send_alert(alert_data: AlertCreate):
 ##############################################################################
 # 5) Run if main
 ##############################################################################
-if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=9000)
+# if __name__ == "__main__":
+#     uvicorn.run(app, host="0.0.0.0", port=80)
