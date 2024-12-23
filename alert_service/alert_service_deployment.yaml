@@ -2,6 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: alert-service-deploy
+  namespace: datavisionaries-project
   labels:
     app: alert-service
 spec:
@@ -19,6 +20,13 @@ spec:
         image: adamterlo/alert:latest
         ports:
         - containerPort: 9000
+        resources:
+          requests:
+            memory: "32Mi"
+            cpu: "25m"
+          limits:
+            memory: "64Mi"
+            cpu: "50m"
         # If you need environment variables, add them here:
         # env:
         #   - name: SMTP_HOST
