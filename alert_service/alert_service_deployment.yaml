@@ -1,0 +1,25 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: alert-service-deploy
+  labels:
+    app: alert-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: alert-service
+  template:
+    metadata:
+      labels:
+        app: alert-service
+    spec:
+      containers:
+      - name: alert-service
+        image: adamterlo/alert:latest
+        ports:
+        - containerPort: 9000
+        # If you need environment variables, add them here:
+        # env:
+        #   - name: SMTP_HOST
+        #     value: "smtp.example.com"
