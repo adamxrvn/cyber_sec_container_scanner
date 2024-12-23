@@ -179,6 +179,29 @@ def health_check():
     return {"status": "ok"}
 
 
+import requests
+
+def send_alert(alert_type: str, message: str, user_email: str):
+    """
+    Calls the Alerting microservice's /alert/send endpoint
+    to create an alert and send an email.
+    """
+    url = "http://localhost:9000/alert/send"  # Adjust if different host/port
+    payload = {
+        "alert_type": alert_type,
+        "message": message,
+        "user_email": user_email
+    }
+    try:
+        resp = requests.post(url, json=payload, timeout=5)
+        resp.raise_for_status()
+        return resp.json()  # The AlertRead object from the alerting service
+    except requests.RequestException as e:
+        print(f"Failed to send alert: {e}")
+        # You might decide to raise an HTTPException or just log the error
+        return None
+
+
 @app.post("/scan", response_model=ScanResponse, tags=["Scanning"])
 def scan_container_endpoint(req: ScanRequest):
     """
@@ -188,6 +211,26 @@ def scan_container_endpoint(req: ScanRequest):
     container_id = req.container_id
     db_id = req.db_id or 1  # default to 1 if not provided
     results = scan_container_for_vulns(container_id, db_id)
+
+    if results:
+        # Build a message summarizing the vulnerabilities
+        count = len(results)
+        lines = [f"- {v.cve} in package {v.package} (version: {v.version})" for v in results]
+        summary = "\n".join(lines)
+
+        msg_body = (
+            f"Hello,\n\n"
+            f"Scan results for container '{container_id}' found {count} vulnerabilities:\n"
+            f"{summary}\n\n"
+            f"Regards,\nScanning Service"
+        )
+
+        send_alert(
+            alert_type="ScanResult",
+            message=msg_body,
+            user_email="azalkhanashvili@edu.hse.ru"
+        )
+
     return ScanResponse(container_id=container_id, vulnerabilities=results)
 
 

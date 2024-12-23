@@ -82,7 +82,7 @@ def extract_packages_from_container(container_id: str):
     return packages
 
 # -----------------------------------
-# Extract packages FROM AN IMAGE (old logic)
+# Extract packages FROM AN IMAGE (!old logic)
 # -----------------------------------
 def extract_packages_from_image(image_name: str):
     packages = []
@@ -139,7 +139,7 @@ class ScanStatusResponse(BaseModel):
 # -----------------------------------
 def perform_image_scan(task_id: int, image_name: str):
     """
-    The old logic that pulls an image and runs dpkg -l or rpm -qa.
+    The !old logic that pulls an image and runs dpkg -l or rpm -qa.
     """
     db: Session = SessionLocal()
     try:
