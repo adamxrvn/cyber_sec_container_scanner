@@ -11,7 +11,7 @@ app = FastAPI(
 )
 
 # ----------------------------------------------------------------------------
-# 1. Mock vulnerability database
+# 1. NVD - PORTION FOR NOW.  TRANSFERED THIS TO THE DB!!!!
 #    Key: (package_name_substring, version_substring)
 #    Value: dictionary with CVE info
 # ----------------------------------------------------------------------------

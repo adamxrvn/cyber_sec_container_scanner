@@ -28,7 +28,6 @@ class VulnerabilityDatabase(Base):
     name = Column(String(100), nullable=False, unique=True)
     description = Column(Text, nullable=True)
     created_at = Column(DateTime, server_default=text("CURRENT_TIMESTAMP"))
-    updated_at = Column(DateTime, server_default=text("CURRENT_TIMESTAMP"))
 
     records = relationship("VulnerabilityRecord", back_populates="database_ref")
 
@@ -49,7 +48,6 @@ class VulnerabilityRecord(Base):
     description = Column(Text, nullable=True)
     source_url = Column(Text, nullable=True)
     created_at = Column(DateTime, server_default=text("CURRENT_TIMESTAMP"))
-    updated_at = Column(DateTime, server_default=text("CURRENT_TIMESTAMP"))
 
     # Unique combo
     __table_args__ = (

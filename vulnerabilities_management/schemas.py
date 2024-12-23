@@ -13,7 +13,6 @@ class VulnerabilityDatabaseRead(BaseModel):
     name: str
     description: Optional[str]
     created_at: datetime
-    updated_at: datetime
 
     class Config:
         orm_mode = True
@@ -38,7 +37,6 @@ class VulnerabilityRecordRead(BaseModel):
     description: Optional[str]
     source_url: Optional[str]
     created_at: datetime
-    updated_at: datetime
 
     class Config:
         orm_mode = True
