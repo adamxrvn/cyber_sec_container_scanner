@@ -1,23 +1,97 @@
 import subprocess
 import uvicorn
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends, status
 from pydantic import BaseModel
 from typing import List, Dict, Any, Optional
 import requests  # We'll make HTTP calls to the vulnerabilities microservice
+from sqlalchemy import Column, Integer, String, Text, Enum, create_engine
+from sqlalchemy.orm import sessionmaker, declarative_base, Session
+import enum
 
 app = FastAPI(
     title="Container Vulnerability Scanner",
     description="Microservice that scans containers and queries VulnerabilitiesManagement for known CVEs",
-    version="1.0.2",
+    version="1.0.3",
     root_path="/api01/scan-service",
     swagger_ui_parameters={"openapiUrl": "/api01/scan-service/openapi.json"}
-
 )
 
+##############################################################################
+# 1. Database Setup with SQLAlchemy
+##############################################################################
+
+DATABASE_URL = "sqlite:///./scan_service.db"  # Using SQLite for simplicity
+
+engine = create_engine(
+    DATABASE_URL, connect_args={"check_same_thread": False}
+)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+Base = declarative_base()
+
+
+# Dependency to get DB session
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
 
 ##############################################################################
-# 1. Pydantic Models
+# 2. Enum Definitions
 ##############################################################################
+
+class ScanStatus(str, enum.Enum):
+    pending = "pending"
+    in_progress = "in_progress"
+    completed = "completed"
+    failed = "failed"
+
+
+class SeverityLevel(str, enum.Enum):
+    low = "LOW"
+    medium = "MEDIUM"
+    high = "HIGH"
+    critical = "CRITICAL"
+
+
+##############################################################################
+# 3. ORM Models
+##############################################################################
+
+class ScanTask(Base):
+    __tablename__ = "scantasks"
+
+    id = Column(Integer, primary_key=True, index=True)
+    container_id = Column(String, unique=True, index=True, nullable=False)
+    db_id = Column(Integer, nullable=False, default=1)
+    status = Column(Enum(ScanStatus), default=ScanStatus.pending, nullable=False)
+    vulnerabilities = Column(Text, nullable=True)  # JSON serialized list
+    user_email = Column(String, nullable=False)
+
+
+class AssessmentRule(Base):
+    __tablename__ = "assessmentrules"
+
+    id = Column(Integer, primary_key=True, index=True)
+    package_name = Column(String, nullable=False)
+    affected_version = Column(String, nullable=False)
+    severity = Column(Enum(SeverityLevel), nullable=False)
+    description = Column(Text, nullable=True)
+    source_url = Column(String, nullable=True)
+
+
+# Create all tables
+Base.metadata.create_all(bind=engine)
+
+
+##############################################################################
+# 4. Pydantic Models
+##############################################################################
+
+# Existing Models
 class ScanRequest(BaseModel):
     container_id: str
     db_id: Optional[int] = 1
@@ -25,6 +99,7 @@ class ScanRequest(BaseModel):
     The ID of the vulnerability database in the vulnerabilities microservice 
     you want to scan against. Defaults to 1 if not provided.
     """
+    user_email: str
 
 
 class VulnerabilityInfo(BaseModel):
@@ -41,8 +116,179 @@ class ScanResponse(BaseModel):
     vulnerabilities: List[VulnerabilityInfo]
 
 
+# New Models for ScanTask
+class ScanTaskCreate(BaseModel):
+    container_id: str
+    db_id: Optional[int] = 1
+    user_email: str
+
+
+class ScanTaskUpdate(BaseModel):
+    container_id: Optional[str] = None
+    db_id: Optional[int] = None
+    status: Optional[ScanStatus] = None
+    vulnerabilities: Optional[str] = None
+    user_email: Optional[str] = None
+
+
+class ScanTaskRead(BaseModel):
+    id: int
+    container_id: str
+    db_id: int
+    status: ScanStatus
+    vulnerabilities: Optional[str] = None
+    user_email: str
+
+    class Config:
+        orm_mode = True
+
+
+# New Models for AssessmentRule
+class AssessmentRuleCreate(BaseModel):
+    package_name: str
+    affected_version: str
+    severity: SeverityLevel
+    description: Optional[str] = None
+    source_url: Optional[str] = None
+
+
+class AssessmentRuleUpdate(BaseModel):
+    package_name: Optional[str] = None
+    affected_version: Optional[str] = None
+    severity: Optional[SeverityLevel] = None
+    description: Optional[str] = None
+    source_url: Optional[str] = None
+
+
+class AssessmentRuleRead(BaseModel):
+    id: int
+    package_name: str
+    affected_version: str
+    severity: SeverityLevel
+    description: Optional[str] = None
+    source_url: Optional[str] = None
+
+    class Config:
+        orm_mode = True
+
+
 ##############################################################################
-# 2. Helpers to parse dpkg/rpm output
+# 5. CRUD Endpoints for ScanTask
+##############################################################################
+
+@app.post("/scantasks/", response_model=ScanTaskRead, status_code=status.HTTP_201_CREATED, tags=["ScanTasks"])
+def create_scantask(task: ScanTaskCreate, db: Session = Depends(get_db)):
+    db_task = db.query(ScanTask).filter(ScanTask.container_id == task.container_id).first()
+    if db_task:
+        raise HTTPException(status_code=400, detail="ScanTask with this container_id already exists.")
+    new_task = ScanTask(
+        container_id=task.container_id,
+        db_id=task.db_id,
+        status=ScanStatus.pending,
+        user_email=task.user_email
+    )
+    db.add(new_task)
+    db.commit()
+    db.refresh(new_task)
+    return new_task
+
+
+@app.get("/scantasks/", response_model=List[ScanTaskRead], tags=["ScanTasks"])
+def read_scantasks(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    tasks = db.query(ScanTask).offset(skip).limit(limit).all()
+    return tasks
+
+
+@app.get("/scantasks/{task_id}/", response_model=ScanTaskRead, tags=["ScanTasks"])
+def read_scantask(task_id: int, db: Session = Depends(get_db)):
+    task = db.query(ScanTask).filter(ScanTask.id == task_id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="ScanTask not found.")
+    return task
+
+
+@app.put("/scantasks/{task_id}/", response_model=ScanTaskRead, tags=["ScanTasks"])
+def update_scantask(task_id: int, task_update: ScanTaskUpdate, db: Session = Depends(get_db)):
+    task = db.query(ScanTask).filter(ScanTask.id == task_id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="ScanTask not found.")
+    for var, value in vars(task_update).items():
+        if value is not None:
+            setattr(task, var, value)
+    db.commit()
+    db.refresh(task)
+    return task
+
+
+@app.delete("/scantasks/{task_id}/", status_code=status.HTTP_204_NO_CONTENT, tags=["ScanTasks"])
+def delete_scantask(task_id: int, db: Session = Depends(get_db)):
+    task = db.query(ScanTask).filter(ScanTask.id == task_id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="ScanTask not found.")
+    db.delete(task)
+    db.commit()
+    return
+
+
+##############################################################################
+# 6. CRUD Endpoints for AssessmentRule
+##############################################################################
+
+@app.post("/assessmentrules/", response_model=AssessmentRuleRead, status_code=status.HTTP_201_CREATED,
+          tags=["AssessmentRules"])
+def create_assessmentrule(rule: AssessmentRuleCreate, db: Session = Depends(get_db)):
+    new_rule = AssessmentRule(
+        package_name=rule.package_name,
+        affected_version=rule.affected_version,
+        severity=rule.severity,
+        description=rule.description,
+        source_url=rule.source_url
+    )
+    db.add(new_rule)
+    db.commit()
+    db.refresh(new_rule)
+    return new_rule
+
+
+@app.get("/assessmentrules/", response_model=List[AssessmentRuleRead], tags=["AssessmentRules"])
+def read_assessmentrules(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    rules = db.query(AssessmentRule).offset(skip).limit(limit).all()
+    return rules
+
+
+@app.get("/assessmentrules/{rule_id}/", response_model=AssessmentRuleRead, tags=["AssessmentRules"])
+def read_assessmentrule(rule_id: int, db: Session = Depends(get_db)):
+    rule = db.query(AssessmentRule).filter(AssessmentRule.id == rule_id).first()
+    if not rule:
+        raise HTTPException(status_code=404, detail="AssessmentRule not found.")
+    return rule
+
+
+@app.put("/assessmentrules/{rule_id}/", response_model=AssessmentRuleRead, tags=["AssessmentRules"])
+def update_assessmentrule(rule_id: int, rule_update: AssessmentRuleUpdate, db: Session = Depends(get_db)):
+    rule = db.query(AssessmentRule).filter(AssessmentRule.id == rule_id).first()
+    if not rule:
+        raise HTTPException(status_code=404, detail="AssessmentRule not found.")
+    for var, value in vars(rule_update).items():
+        if value is not None:
+            setattr(rule, var, value)
+    db.commit()
+    db.refresh(rule)
+    return rule
+
+
+@app.delete("/assessmentrules/{rule_id}/", status_code=status.HTTP_204_NO_CONTENT, tags=["AssessmentRules"])
+def delete_assessmentrule(rule_id: int, db: Session = Depends(get_db)):
+    rule = db.query(AssessmentRule).filter(AssessmentRule.id == rule_id).first()
+    if not rule:
+        raise HTTPException(status_code=404, detail="AssessmentRule not found.")
+    db.delete(rule)
+    db.commit()
+    return
+
+
+##############################################################################
+# 7. Existing Scanning Logic
 ##############################################################################
 def parse_dpkg_output(output: str) -> List[Dict[str, str]]:
     """
@@ -76,9 +322,6 @@ def parse_rpm_output(output: str) -> List[Dict[str, str]]:
     return packages
 
 
-##############################################################################
-# 3. The scanning logic (no local dict). We'll fetch from VulnMgmt microservice
-##############################################################################
 def fetch_vulnerabilities_from_db(db_id: int) -> List[Dict[str, Any]]:
     """
     GET /vuln?db_id={db_id} from the vulnerabilities microservice
@@ -175,14 +418,8 @@ def scan_container_for_vulns(container_id: str, db_id: int) -> List[Vulnerabilit
 
 
 ##############################################################################
-# 4. FastAPI Endpoints
+# 8. Alerting Functionality
 ##############################################################################
-@app.get("/health")
-def health_check():
-    return {"status": "ok"}
-
-
-import requests
 
 def send_alert(alert_type: str, message: str, user_email: str):
     """
@@ -205,15 +442,42 @@ def send_alert(alert_type: str, message: str, user_email: str):
         return None
 
 
+##############################################################################
+# 9. Existing Scan Endpoint
+##############################################################################
+
 @app.post("/scan", response_model=ScanResponse, tags=["Scanning"])
-def scan_container_endpoint(req: ScanRequest):
+def scan_container_endpoint(req: ScanRequest, db: Session = Depends(get_db)):
     """
     Scans the container for known vulnerabilities from the given 'db_id'
     in the Vulnerabilities Management service.
+    Also creates a ScanTask entry.
     """
     container_id = req.container_id
     db_id = req.db_id or 1  # default to 1 if not provided
-    results = scan_container_for_vulns(container_id, db_id)
+    user_email = req.user_email
+
+    # Create ScanTask
+    scantask = ScanTask(
+        container_id=container_id,
+        db_id=db_id,
+        status=ScanStatus.in_progress,
+        user_email=user_email
+    )
+    db.add(scantask)
+    db.commit()
+    db.refresh(scantask)
+
+    try:
+        results = scan_container_for_vulns(container_id, db_id)
+        scantask.status = ScanStatus.completed
+        scantask.vulnerabilities = ", ".join([v.cve for v in results])  # Simplified storage
+        db.commit()
+    except HTTPException as e:
+        scantask.status = ScanStatus.failed
+        scantask.vulnerabilities = e.detail
+        db.commit()
+        raise e
 
     if results:
         # Build a message summarizing the vulnerabilities
@@ -231,14 +495,23 @@ def scan_container_endpoint(req: ScanRequest):
         send_alert(
             alert_type="ScanResult",
             message=msg_body,
-            user_email="azalkhanashvili@edu.hse.ru"
+            user_email=user_email
         )
 
     return ScanResponse(container_id=container_id, vulnerabilities=results)
 
 
 ##############################################################################
-# 5. Run if main
+# 10. Additional Endpoints
+##############################################################################
+
+@app.get("/health", tags=["Scanning"])
+def health_check():
+    return {"status": "ok"}
+
+
+##############################################################################
+# 11. Run if main
 ##############################################################################
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)

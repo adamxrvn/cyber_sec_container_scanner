@@ -3,3 +3,4 @@ pydantic==2.10.4
 Requests==2.32.3
 uvicorn==0.34.0
 docker==5.0.2
+sqlalchemy==1.4.25
