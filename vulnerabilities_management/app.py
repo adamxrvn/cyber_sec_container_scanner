@@ -306,5 +306,5 @@ def bulk_import_vulnerabilities(db_name: str, items: List[BulkImportItem]):
 ##############################################################################
 #                  Run if main
 ##############################################################################
-# if __name__ == "__main__":
-#     uvicorn.run(app, host="0.0.0.0", port=7000)
+if __name__ == "__main__":
+    uvicorn.run(app, host="0.0.0.0", port=82)
