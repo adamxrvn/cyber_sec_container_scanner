@@ -17,6 +17,20 @@ spec:
                 name: alert-service
                 port:
                   number: 80
+          - path: /api01/scan-service(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: scan-service
+                port:
+                  number: 81
+          - path: /api01/vuln-service(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: vuln-service
+                port:
+                  number: 82
 #          - path: /kea-project/pong
 #            pathType: Prefix
 #            backend:

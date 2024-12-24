@@ -1,0 +1,33 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vuln-service
+  namespace: datavisionaries-project
+  labels:
+    app: vuln-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: vuln-service
+  template:
+    metadata:
+      labels:
+        app: vuln-service
+    spec:
+      containers:
+      - name: vuln-service
+        image: adamterlo/vuln:latest
+        ports:
+        - containerPort: 82
+        resources:
+          requests:
+            memory: "32Mi"
+            cpu: "25m"
+          limits:
+            memory: "64Mi"
+            cpu: "50m"
+        # If you need environment variables, add them here:
+        # env:
+        #   - name: SMTP_HOST
+        #     value: "smtp.example.com"

@@ -8,7 +8,10 @@ import requests  # We'll make HTTP calls to the vulnerabilities microservice
 app = FastAPI(
     title="Container Vulnerability Scanner",
     description="Microservice that scans containers and queries VulnerabilitiesManagement for known CVEs",
-    version="1.0.2"
+    version="1.0.2",
+    root_path="/api01/scan-service",
+    swagger_ui_parameters={"openapiUrl": "/api01/scan-service/openapi.json"}
+
 )
 
 
@@ -237,5 +240,5 @@ def scan_container_endpoint(req: ScanRequest):
 ##############################################################################
 # 5. Run if main
 ##############################################################################
-if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+# if __name__ == "__main__":
+#     uvicorn.run(app, host="0.0.0.0", port=8000)

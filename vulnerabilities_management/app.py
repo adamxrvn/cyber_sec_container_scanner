@@ -18,7 +18,9 @@ from datetime import datetime
 app = FastAPI(
     title="Vulnerabilities Management",
     description="Microservice for storing and managing vulnerability data (CVE) from different sources",
-    version="1.0.0"
+    version="1.0.0",
+    root_path="/api01/vuln-service",
+    swagger_ui_parameters={"openapiUrl": "/api01/vuln-service/openapi.json"}
 )
 
 # Initialize DB
@@ -304,5 +306,5 @@ def bulk_import_vulnerabilities(db_name: str, items: List[BulkImportItem]):
 ##############################################################################
 #                  Run if main
 ##############################################################################
-if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=7000)
+# if __name__ == "__main__":
+#     uvicorn.run(app, host="0.0.0.0", port=7000)

@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: scan-service
+  namespace: datavisionaries-project
+  labels:
+    app: scan-service
+spec:
+  type: ClusterIP
+  selector:
+    app: scan-service
+  ports:
+    - port: 81
+      targetPort: 81
+      protocol: TCP
+      name: http
+

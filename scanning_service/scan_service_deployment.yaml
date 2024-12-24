@@ -1,0 +1,33 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: scan-service
+  namespace: datavisionaries-project
+  labels:
+    app: scan-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: scan-service
+  template:
+    metadata:
+      labels:
+        app: scan-service
+    spec:
+      containers:
+      - name: scan-service
+        image: adamterlo/scan:latest
+        ports:
+        - containerPort: 81
+        resources:
+          requests:
+            memory: "32Mi"
+            cpu: "25m"
+          limits:
+            memory: "64Mi"
+            cpu: "50m"
+        # If you need environment variables, add them here:
+        # env:
+        #   - name: SMTP_HOST
+        #     value: "smtp.example.com"

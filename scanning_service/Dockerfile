@@ -15,6 +15,6 @@ COPY . .
 # But typically your scanning container just needs the code plus `docker.from_env()` logic,
 # as long as the host provides access to Docker socket.
 
-EXPOSE 8000
+EXPOSE 81
 
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "81"]
