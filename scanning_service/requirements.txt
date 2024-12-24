@@ -2,3 +2,4 @@ fastapi==0.115.6
 pydantic==2.10.4
 Requests==2.32.3
 uvicorn==0.34.0
+docker==5.0.2
